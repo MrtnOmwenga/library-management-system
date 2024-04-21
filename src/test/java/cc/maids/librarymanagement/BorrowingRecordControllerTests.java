@@ -1,13 +1,14 @@
 package cc.maids.librarymanagement.tests;
 
 import cc.maids.librarymanagement.models.BorrowingRecord;
+import cc.maids.librarymanagement.security.AuthRequest;
+import cc.maids.librarymanagement.security.AuthResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpMethod;
+import org.springframework.http.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,6 +18,22 @@ public class BorrowingRecordControllerTests {
     @Autowired
     private TestRestTemplate restTemplate;
 
+    private HttpHeaders headers;
+
+    @BeforeEach
+    public void setup() {
+        AuthRequest authRequest = new AuthRequest();
+        authRequest.setUsername("admin");
+        authRequest.setPassword("password");
+
+        ResponseEntity<AuthResponse> authResponse = restTemplate.postForEntity("/api/login", authRequest, AuthResponse.class);
+        assertThat(authResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String token = authResponse.getBody().getToken();
+        headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+    }
+
     @Test
     public void testCreateBorrowingRecord() {
         BorrowingRecord newRecord = new BorrowingRecord();
@@ -25,7 +42,8 @@ public class BorrowingRecordControllerTests {
         newRecord.setBorrowingDate(java.time.LocalDate.now());
         newRecord.setReturnDate(java.time.LocalDate.now().plusDays(14));
 
-        ResponseEntity<BorrowingRecord> response = restTemplate.postForEntity("/api/borrowing-records", newRecord, BorrowingRecord.class);
+        HttpEntity<BorrowingRecord> requestEntity = new HttpEntity<>(newRecord, headers);
+        ResponseEntity<BorrowingRecord> response = restTemplate.postForEntity("/api/borrowing-records", requestEntity, BorrowingRecord.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         BorrowingRecord createdRecord = response.getBody();
@@ -38,7 +56,8 @@ public class BorrowingRecordControllerTests {
 
     @Test
     public void testGetBorrowingRecordById() {
-        ResponseEntity<BorrowingRecord> response = restTemplate.getForEntity("/api/borrowing-records/1", BorrowingRecord.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<BorrowingRecord> response = restTemplate.exchange("/api/borrowing-records/1", HttpMethod.GET, requestEntity, BorrowingRecord.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         BorrowingRecord record = response.getBody();
@@ -54,9 +73,10 @@ public class BorrowingRecordControllerTests {
         updatedRecord.setBorrowingDate(java.time.LocalDate.now());
         updatedRecord.setReturnDate(java.time.LocalDate.now().plusDays(7));
 
-        restTemplate.put("/api/borrowing-records/1", updatedRecord);
+        HttpEntity<BorrowingRecord> requestEntity = new HttpEntity<>(updatedRecord, headers);
+        restTemplate.exchange("/api/borrowing-records/1", HttpMethod.PUT, requestEntity, Void.class);
 
-        ResponseEntity<BorrowingRecord> response = restTemplate.getForEntity("/api/borrowing-records/1", BorrowingRecord.class);
+        ResponseEntity<BorrowingRecord> response = restTemplate.exchange("/api/borrowing-records/1", HttpMethod.GET, requestEntity, BorrowingRecord.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         BorrowingRecord record = response.getBody();
@@ -69,10 +89,11 @@ public class BorrowingRecordControllerTests {
 
     @Test
     public void testDeleteBorrowingRecord() {
-        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/borrowing-records/1", HttpMethod.DELETE, null, Void.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/borrowing-records/1", HttpMethod.DELETE, requestEntity, Void.class);
         assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<BorrowingRecord> getResponse = restTemplate.getForEntity("/api/borrowing-records/1", BorrowingRecord.class);
+        ResponseEntity<BorrowingRecord> getResponse = restTemplate.exchange("/api/borrowing-records/1", HttpMethod.GET, requestEntity, BorrowingRecord.class);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

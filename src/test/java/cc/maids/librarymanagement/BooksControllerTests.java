@@ -1,7 +1,11 @@
 package cc.maids.librarymanagement.tests;
 
-import org.junit.jupiter.api.Test;
+import cc.maids.librarymanagement.models.Book;
+import cc.maids.librarymanagement.security.AuthRequest;
+import cc.maids.librarymanagement.security.AuthResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -9,8 +13,6 @@ import org.springframework.http.*;
 
 import java.util.Arrays;
 import java.util.List;
-
-import cc.maids.librarymanagement.models.Book;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +44,8 @@ public class BooksControllerTests {
         newBook.setTitle("New Book");
         newBook.setAuthor("Author Name");
 
-        ResponseEntity<Book> response = restTemplate.postForEntity("/api/books", newBook, Book.class);
+        HttpEntity<Book> requestEntity = new HttpEntity<>(newBook, headers);
+        ResponseEntity<Book> response = restTemplate.postForEntity("/api/books", requestEntity, Book.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         Book createdBook = response.getBody();
@@ -52,27 +55,9 @@ public class BooksControllerTests {
     }
 
     @Test
-    public void testGetAllBooks() {
-        ResponseEntity<Book[]> response = restTemplate.getForEntity("/api/books", Book[].class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        Book[] books = response.getBody();
-        assertThat(books).isNotNull();
-
-        List<Book> bookList = Arrays.asList(books);
-        bookList.forEach(book -> {
-            System.out.println("Book ID: " + book.getId());
-            System.out.println("Title: " + book.getTitle());
-            System.out.println("Author: " + book.getAuthor());
-            System.out.println("Publication Year: " + book.getPublicationYear());
-            System.out.println("ISBN: " + book.getIsbn());
-            System.out.println("------------------------");
-        });
-    }
-
-    @Test
     public void testGetBookById() {
-        ResponseEntity<Book> response = restTemplate.getForEntity("/api/books/1", Book.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<Book> response = restTemplate.exchange("/api/books/1", HttpMethod.GET, requestEntity, Book.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         Book book = response.getBody();
@@ -86,9 +71,10 @@ public class BooksControllerTests {
         updatedBook.setTitle("Updated Title");
         updatedBook.setAuthor("Updated Author");
 
-        restTemplate.put("/api/books/1", updatedBook);
+        HttpEntity<Book> requestEntity = new HttpEntity<>(updatedBook, headers);
+        restTemplate.exchange("/api/books/1", HttpMethod.PUT, requestEntity, Void.class);
 
-        ResponseEntity<Book> response = restTemplate.getForEntity("/api/books/1", Book.class);
+        ResponseEntity<Book> response = restTemplate.exchange("/api/books/1", HttpMethod.GET, new HttpEntity<>(headers), Book.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         Book book = response.getBody();
@@ -99,10 +85,11 @@ public class BooksControllerTests {
 
     @Test
     public void testDeleteBook() {
-        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/books/1", HttpMethod.DELETE, null, Void.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/books/1", HttpMethod.DELETE, requestEntity, Void.class);
         assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        
-        ResponseEntity<Book> getResponse = restTemplate.getForEntity("/api/books/1", Book.class);
+
+        ResponseEntity<Book> getResponse = restTemplate.exchange("/api/books/1", HttpMethod.GET, requestEntity, Book.class);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

@@ -5,30 +5,31 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
+import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.Collections;
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
-
-    @Value("${jwt.expiration}")
     private long jwtExpiration;
 
     private Key key;
 
-    public JwtTokenProvider() {
-        // Initialize the key using a secret value
+    @Autowired
+    public JwtTokenProvider(@Value("${jwt.secret}") String jwtSecret, @Value("${jwt.expiration}") long jwtExpiration) {
         this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        this.jwtExpiration = jwtExpiration;
     }
 
     public String createToken(String username) {
         Date now = new Date();
-        Date expirationDate = new Date(now.getTime() + jwtExpiration);
+        Date expirationDate = new Date(now.getTime() + this.jwtExpiration);
 
         return Jwts.builder()
                 .setSubject(username)
@@ -57,5 +58,14 @@ public class JwtTokenProvider {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public String resolveToken(HttpServletRequest request) {
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            return authorizationHeader.substring(7);
+        }
+
+        return null;
     }
 }

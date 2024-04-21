@@ -1,13 +1,14 @@
 package cc.maids.librarymanagement.tests;
 
 import cc.maids.librarymanagement.models.Patron;
+import cc.maids.librarymanagement.security.AuthRequest;
+import cc.maids.librarymanagement.security.AuthResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpMethod;
+import org.springframework.http.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,12 +18,30 @@ public class PatronControllerTests {
     @Autowired
     private TestRestTemplate restTemplate;
 
+    private HttpHeaders headers;
+
+    @BeforeEach
+    public void setup() {
+        AuthRequest authRequest = new AuthRequest();
+        authRequest.setUsername("admin");
+        authRequest.setPassword("password");
+
+        ResponseEntity<AuthResponse> authResponse = restTemplate.postForEntity("/api/login", authRequest, AuthResponse.class);
+        assertThat(authResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String token = authResponse.getBody().getToken();
+        headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+    }
+
     @Test
     public void testCreatePatron() {
         Patron newPatron = new Patron();
         newPatron.setName("John Doe");
+        newPatron.setContactInformation("johndoe@email.com");
 
-        ResponseEntity<Patron> response = restTemplate.postForEntity("/api/patrons", newPatron, Patron.class);
+        HttpEntity<Patron> requestEntity = new HttpEntity<>(newPatron, headers);
+        ResponseEntity<Patron> response = restTemplate.postForEntity("/api/patrons", requestEntity, Patron.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         Patron createdPatron = response.getBody();
@@ -32,7 +51,8 @@ public class PatronControllerTests {
 
     @Test
     public void testGetPatronById() {
-        ResponseEntity<Patron> response = restTemplate.getForEntity("/api/patrons/1", Patron.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<Patron> response = restTemplate.exchange("/api/patrons/1", HttpMethod.GET, requestEntity, Patron.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         Patron patron = response.getBody();
@@ -44,10 +64,12 @@ public class PatronControllerTests {
     public void testUpdatePatron() {
         Patron updatedPatron = new Patron();
         updatedPatron.setName("Jane Doe");
+        updatedPatron.setContactInformation("janedoe@email.com");
 
-        restTemplate.put("/api/patrons/1", updatedPatron);
+        HttpEntity<Patron> requestEntity = new HttpEntity<>(updatedPatron, headers);
+        restTemplate.exchange("/api/patrons/1", HttpMethod.PUT, requestEntity, Void.class);
 
-        ResponseEntity<Patron> response = restTemplate.getForEntity("/api/patrons/1", Patron.class);
+        ResponseEntity<Patron> response = restTemplate.exchange("/api/patrons/1", HttpMethod.GET, requestEntity, Patron.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         Patron patron = response.getBody();
@@ -57,10 +79,11 @@ public class PatronControllerTests {
 
     @Test
     public void testDeletePatron() {
-        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/patrons/1", HttpMethod.DELETE, null, Void.class);
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        ResponseEntity<Void> deleteResponse = restTemplate.exchange("/api/patrons/1", HttpMethod.DELETE, requestEntity, Void.class);
         assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<Patron> getResponse = restTemplate.getForEntity("/api/patrons/1", Patron.class);
+        ResponseEntity<Patron> getResponse = restTemplate.exchange("/api/patrons/1", HttpMethod.GET, requestEntity, Patron.class);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }
